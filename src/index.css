@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* small helper for BG overlay if needed */
+.card-bg {
+  background-blend-mode: multiply;
+}
+
+/* focus visible */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.16);
+}
+
+/* optional: gaya untuk NavLink aktif (jika tidak pakai className function) */
+.navlink-active {
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.25); /* sky-400 */
+}
+
+
+/* page-level spacing tweak */
+html, body, #root {
+  height: 100%;
+}
+
