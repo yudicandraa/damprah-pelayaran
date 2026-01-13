@@ -1,99 +1,147 @@
-// src/components/DocumentTable.tsx
-import React from "react";
-import { TrashIcon, CloudArrowUpIcon } from "@heroicons/react/24/solid";
+import React, { useState } from "react";
+import { CloudArrowUpIcon, TrashIcon } from "@heroicons/react/24/solid";
 import { getUserRole } from "../auth/auth";
 
-export type DocumentRow = {
-  id: string;
+type FileItem = {
+  id: number;
+  file_name: string;
+  file_path: string;
+};
+
+type Row = {
+  templateId: string;
   title: string;
-  status: "Belum Unggah" | "Sudah Unggah";
-  note?: string;
+  status: string;
+  fileCount: number;
+  files: FileItem[];
 };
 
-type Props = {
+export default function DocumentTable({
+  portId,
+  rows,
+  onChanged,
+}: {
   portId: string;
-  rows: DocumentRow[];
-};
+  rows: Row[];
+  onChanged?: () => void;
+}) {
+  const isAdmin = getUserRole() === "admin";
+  const [openRow, setOpenRow] = useState<Row | null>(null);
+  const [loading, setLoading] = useState(false);
 
-export default function DocumentTable({ portId, rows }: Props) {
-  const role = getUserRole();
-  const isAdmin = role === "admin";
+  async function upload(templateId: string, file: File) {
+    setLoading(true);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("portId", portId);
+    form.append("templateId", templateId);
 
-  function handleFileSelected(templateId: string, file: File) {
-    if (!isAdmin) return;
-    console.log("UPLOAD:", templateId, file);
-    // nanti sambungkan ke Supabase / API upload
+    await fetch("http://localhost:4000/api/documents/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: form,
+    });
+
+    setLoading(false);
+    onChanged?.();
   }
 
-  function handleDelete(templateId: string) {
-    if (!isAdmin) return;
-    console.log("DELETE:", templateId);
-    // nanti sambungkan ke API delete
+  async function deleteFile(id: number) {
+    if (!confirm("Hapus file ini?")) return;
+
+    await fetch(
+      `http://localhost:4000/api/documents/file/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    onChanged?.();
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-slate-100 text-left text-sm">
-            <th className="p-2">Dokumen</th>
-            <th className="p-2">Status</th>
-            <th className="p-2">Keterangan</th>
-            {isAdmin && <th className="p-2 text-right">Aksi</th>}
-          </tr>
-        </thead>
-
+    <>
+      <table className="w-full">
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b">
-              <td className="p-2 font-medium">{r.title}</td>
+            <tr key={r.templateId} className="border-b">
+              <td className="p-2">{r.title}</td>
               <td className="p-2">
-                <span
-                  className={`text-xs px-2 py-1 rounded ${
-                    r.status === "Sudah Unggah"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {r.status}
-                </span>
+                {r.fileCount > 0 ? (
+                  <button
+                    onClick={() => setOpenRow(r)}
+                    className="text-sky-600 underline"
+                  >
+                    Sudah Unggah ({r.fileCount})
+                  </button>
+                ) : (
+                  "Belum Unggah"
+                )}
               </td>
-              <td className="p-2 text-sm text-slate-600">
-                {r.note ?? "-"}
-              </td>
-
-              {/* ADMIN ONLY */}
               {isAdmin && (
                 <td className="p-2">
-                  <div className="flex justify-end gap-2">
-                    <label className="flex items-center gap-1 px-2 py-1 rounded bg-sky-50 hover:bg-sky-100 cursor-pointer text-xs">
-                      <CloudArrowUpIcon className="w-4 h-4 text-sky-600" />
-                      Unggah
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.currentTarget.files?.[0];
-                          if (f) handleFileSelected(r.id, f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-
-                    <button
-                      onClick={() => handleDelete(r.id)}
-                      className="px-2 py-1 rounded bg-red-50 hover:bg-red-100"
-                      title="Hapus"
-                    >
-                      <TrashIcon className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
+                  <label className="cursor-pointer text-xs flex items-center gap-1">
+                    <CloudArrowUpIcon className="w-4 h-4" />
+                    Upload
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) =>
+                        e.target.files &&
+                        upload(r.templateId, e.target.files[0])
+                      }
+                    />
+                  </label>
                 </td>
               )}
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+
+      {/* MODAL LIST FILE */}
+      {openRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-4 rounded w-96">
+            <h3 className="font-bold mb-2">{openRow.title}</h3>
+
+            <ul className="space-y-2">
+              {openRow.files.map((f) => (
+                <li key={f.id} className="flex justify-between">
+                  <a
+                    href={`http://localhost:4000/api/documents/download/${f.id}`}
+                    target="_blank"
+                    className="text-sky-600 text-sm"
+                  >
+                    {f.file_name}
+                  </a>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => deleteFile(f.id)}
+                      className="text-red-600"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => setOpenRow(null)}
+              className="mt-3 text-sm"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

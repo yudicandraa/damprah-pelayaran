@@ -12,6 +12,7 @@ export const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 db.serialize(() => {
+  // USERS
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,5 +23,20 @@ db.serialize(() => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // DOCUMENTS
+  db.run(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      port_id TEXT NOT NULL,
+      template_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      uploaded_by TEXT,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (port_id, template_id)
+    )
+  `);
 });
+
 

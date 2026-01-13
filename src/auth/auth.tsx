@@ -2,17 +2,28 @@ import { jwtDecode } from "jwt-decode";
 
 type JwtPayload = {
   id: number;
-  role: "admin" | "user";
-  exp: number;
+  role: string;
+  exp?: number;
 };
 
-export function getUserRole(): JwtPayload["role"] | null {
-  const token = localStorage.getItem("token");
+export function getToken() {
+  return localStorage.getItem("token");
+}
+
+export function getUserRole(): "admin" | "user" | null {
+  const token = getToken();
   if (!token) return null;
 
   try {
     const decoded = jwtDecode<JwtPayload>(token);
-    return decoded.role;
+
+    // token expired
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      logout();
+      return null;
+    }
+
+    return decoded.role as "admin" | "user";
   } catch {
     return null;
   }
@@ -20,5 +31,4 @@ export function getUserRole(): JwtPayload["role"] | null {
 
 export function logout() {
   localStorage.removeItem("token");
-  window.location.href = "/login";
 }

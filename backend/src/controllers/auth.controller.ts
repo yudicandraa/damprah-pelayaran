@@ -24,11 +24,12 @@ export function login(req: Request, res: Response) {
         return res.status(401).json({ message: "Password salah" });
       }
 
-      const token = jwt.sign(
-        { id: user.id, role: user.role },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "1d" }
-      );
+   const token = jwt.sign(
+  { id: user.id, role: user.role },
+  process.env.JWT_SECRET as string,
+  { expiresIn: "1d" }
+);
+
 
       res.json({
         token,

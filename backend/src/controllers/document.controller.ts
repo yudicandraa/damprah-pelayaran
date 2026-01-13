@@ -1,0 +1,144 @@
+import { Request, Response } from "express";
+import path from "path";
+import { db } from "../config/db";
+import fs from "fs";
+import mime from "mime-types";
+
+// ============================
+// LIST DOCUMENTS BY PORT
+// ============================
+export function getDocumentsByPort(req: Request, res: Response) {
+  const { portId } = req.params;
+
+  db.all(
+    `SELECT id, port_id, template_id, file_name, file_path, uploaded_at
+     FROM documents
+     WHERE port_id = ?
+     ORDER BY uploaded_at DESC`,
+    [portId],
+    (err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      res.json(rows);
+    }
+  );
+}
+
+// ============================
+// UPLOAD DOCUMENT (LOCAL)
+// ============================
+export function uploadDocument(req: Request, res: Response) {
+  const file = req.file;
+  const { portId, templateId } = req.body;
+  const user = (req as any).user;
+
+  if (!file) {
+    return res.status(400).json({ message: "File tidak ditemukan" });
+  }
+
+  const filePath = file.path.replace(/\\/g, "/");
+
+  db.run(
+    `INSERT INTO documents 
+     (port_id, template_id, file_name, file_path, uploaded_by)
+     VALUES (?,?,?,?,?)`,
+    [portId, templateId, file.originalname, filePath, user?.id ?? "admin"],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error" });
+      }
+      res.json({ message: "Upload berhasil", id: this.lastID });
+    }
+  );
+}
+
+// preview document (inline or attachment based on type)
+export function previewDocument(req: Request, res: Response) {
+  const { id } = req.params;
+
+  db.get(
+    `SELECT file_path, file_name FROM documents WHERE id = ?`,
+    [id],
+    (err, row: any) => {
+      if (err || !row) {
+        return res.status(404).json({ message: "File tidak ditemukan" });
+      }
+
+      const filePath = path.resolve(row.file_path);
+      const mimeType = mime.lookup(filePath) || "application/octet-stream";
+
+      const PREVIEWABLE_MIME = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "text/plain",
+      ];
+
+      const isPreviewable = PREVIEWABLE_MIME.includes(mimeType);
+
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `${isPreviewable ? "inline" : "attachment"}; filename="${row.file_name}"`
+      );
+
+      fs.createReadStream(filePath)
+        .on("error", () => res.status(500).end())
+        .pipe(res);
+    }
+  );
+}
+
+
+
+// ============================
+// DOWNLOAD DOCUMENT (ATTACHMENT)
+// ============================
+export function downloadDocument(req: Request, res: Response) {
+  const { id } = req.params;
+
+  db.get(
+    `SELECT file_path, file_name FROM documents WHERE id = ?`,
+    [id],
+    (err, row: any) => {
+      if (err || !row) {
+        return res.status(404).json({ message: "File tidak ditemukan" });
+      }
+
+      res.download(path.resolve(row.file_path), row.file_name);
+    }
+  );
+}
+
+// ============================
+// DELETE DOCUMENT
+// ============================
+export function deleteDocument(req: Request, res: Response) {
+  const { id } = req.params;
+
+  db.get(
+    `SELECT file_path FROM documents WHERE id = ?`,
+    [id],
+    (err, row: any) => {
+      if (!row) {
+        return res.status(404).json({ message: "File tidak ditemukan" });
+      }
+
+      db.run(
+        `DELETE FROM documents WHERE id = ?`,
+        [id],
+        (err2) => {
+          if (err2) {
+            console.error(err2);
+            return res.status(500).json({ message: "Gagal menghapus" });
+          }
+          res.json({ message: "File dihapus" });
+        }
+      );
+    }
+  );
+}
