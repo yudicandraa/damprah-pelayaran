@@ -9,30 +9,27 @@ import Pelabuhan from "./pages/Pelabuhan";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-/* ================= DASHBOARD LAYOUT ================= */
-
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(true);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* SIDEBAR (FIXED) */}
       <SidebarOptimized
         collapsed={collapsed}
         setCollapsed={setCollapsed}
       />
 
-      {/* CONTENT */}
       <div
-        className={`transition-all duration-300
-          ${collapsed ? "ml-20" : "ml-80"}
+        className={`
+          transition-all duration-300
+          ml-0
+          md:ml-20
+          ${!collapsed ? "md:ml-80" : ""}
         `}
       >
-        {/* HEADER TETAP DI ATAS */}
         <Header />
 
-        {/* MAIN CONTENT (SCROLL DI SINI) */}
-        <main className="p-6 md:p-8 lg:p-12">
+        <main className="p-4 sm:p-6 md:p-8 lg:p-12">
           {children}
         </main>
       </div>
@@ -40,16 +37,13 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ================= APP ================= */
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ===== LOGIN ===== */}
         <Route path="/login" element={<Login />} />
 
-        {/* ===== DASHBOARD ===== */}
         <Route
           path="/"
           element={

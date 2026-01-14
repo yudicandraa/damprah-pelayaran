@@ -6,14 +6,19 @@ export function requireAuth(
   res: Response,
   next: NextFunction
 ) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  // 1️⃣ Ambil token dari QUERY dulu
+  const queryToken = req.query.token as string | undefined;
 
-  const token = authHeader.split(" ")[1];
+  // 2️⃣ Ambil token dari HEADER (fallback)
+  const authHeader = req.headers.authorization;
+  const headerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : undefined;
+
+  const token = queryToken || headerToken;
+
   if (!token) {
-    return res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
@@ -22,7 +27,6 @@ export function requireAuth(
       process.env.JWT_SECRET as string
     );
 
-    // simpan user ke request
     (req as any).user = payload;
     next();
   } catch (err) {

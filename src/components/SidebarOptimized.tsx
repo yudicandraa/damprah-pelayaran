@@ -1,96 +1,26 @@
 import React, { useCallback } from "react";
-import { HomeIcon, GlobeAltIcon } from "@heroicons/react/24/solid";
+import {
+  HomeIcon,
+  GlobeAltIcon,
+  Bars3Icon,
+  XMarkIcon,
+} from "@heroicons/react/24/solid";
 import { useNavigate, useLocation } from "react-router-dom";
-
-/* ================= TYPES ================= */
-
-interface NavButtonProps {
-  icon: React.ElementType;
-  label: string;
-  active: boolean;
-  collapsed: boolean;
-  onClick: () => void;
-}
-
-interface SidebarProps {
-  collapsed: boolean;
-  setCollapsed: (v: boolean) => void;
-}
-
-/* ================= DATA ================= */
 
 const NAV_ITEMS = [
   { id: "home", icon: HomeIcon, label: "Beranda", path: "/" },
   { id: "pelabuhan", icon: GlobeAltIcon, label: "Pelabuhan", path: "/pelabuhan" },
 ];
 
-/* ================= NAV BUTTON ================= */
-
-function NavButton({
-  icon: Icon,
-  label,
-  active,
-  collapsed,
-  onClick,
-}: NavButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={`
-        group w-full rounded-lg transition-colors duration-200
-        ${collapsed
-          ? "flex justify-center py-3"
-          : "flex items-center gap-3 px-3 py-2"}
-        ${
-          active
-            ? "bg-white shadow ring-2 ring-sky-300"
-            : "hover:bg-white/10"
-        }
-      `}
-    >
-      {/* ICON */}
-      <Icon
-        className={`
-          w-6 h-6 shrink-0 transition-colors duration-200
-          ${
-            active
-              ? "text-sky-900"
-              : "text-white/70 group-hover:text-white"
-          }
-        `}
-      />
-
-      {/* TEXT (HANYA TERLIHAT SAAT EXPANDED) */}
-      {!collapsed && (
-        <span
-          className={`
-            whitespace-nowrap font-medium transition-colors duration-200
-            ${
-              active
-                ? "text-sky-900"
-                : "text-white/80 group-hover:text-white"
-            }
-          `}
-        >
-          {label}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/* ================= SIDEBAR ================= */
-
 export default function SidebarOptimized({
   collapsed,
   setCollapsed,
-}: SidebarProps) {
+}: {
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const active =
-    NAV_ITEMS.find((i) => i.path === location.pathname)?.id || "home";
 
   const toggle = useCallback(
     () => setCollapsed(!collapsed),
@@ -98,59 +28,158 @@ export default function SidebarOptimized({
   );
 
   return (
-    <aside
-      className={`
-        fixed top-0 left-0 h-screen
-        ${collapsed ? "w-20" : "w-80"}
-        transition-[width] duration-300 ease-in-out
-        bg-gradient-to-b from-sky-900 to-sky-300
-        flex flex-col z-50
-        overflow-hidden
-      `}
-    >
-      {/* ===== HEADER / LOGO ===== */}
-      <div
-        className={`
-          flex flex-col items-center border-b border-white/20
-          ${collapsed ? "justify-center py-6" : "px-4 pt-6 pb-5"}
-        `}
+    <>
+      {/* =====================================================
+          HAMBURGER BUTTON (KANAN ATAS - MOBILE)
+      ===================================================== */}
+      <button
+        onClick={toggle}
+        className="
+          fixed top-3 right-3 z-[80]
+          md:hidden
+          bg-white p-2 rounded-lg shadow
+        "
+        aria-label="Toggle menu"
       >
-        <button
-          onClick={toggle}
-          title={collapsed ? "Buka menu" : "Tutup menu"}
-          className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 transition"
-        >
-          <img
-            src="/logo/perhubungan.png"
-            alt="Logo"
-            className="w-11 h-11 object-contain brightness-0 invert"
-          />
-        </button>
+        {collapsed ? (
+          <Bars3Icon className="w-6 h-6 text-slate-800" />
+        ) : (
+          <XMarkIcon className="w-6 h-6 text-slate-800" />
+        )}
+      </button>
 
-        {/* TEXT LOGO (HILANG SAAT COLLAPSED) */}
-        {!collapsed && (
-          <div className="mt-4 text-center">
-            <div className="text-white font-bold text-2xl">DAMPRAH</div>
-            <div className="text-sm text-white/80 leading-snug mt-1">
-              Data Master Pelabuhan Penyeberangan Aceh
+      {/* =====================================================
+          MOBILE FULLSCREEN SIDEBAR
+          - pakai 100dvh → TIDAK kepanjangan di mobile
+          - tidak ikut halaman utama
+      ===================================================== */}
+      {!collapsed && (
+        <div
+          className="
+            fixed top-0 left-0 right-0
+            h-[100dvh]
+            z-[70] md:hidden
+            bg-gradient-to-b from-sky-900 to-sky-300
+            flex
+            overscroll-contain
+          "
+        >
+          {/* CLOSE BUTTON (FIXED → ANTI OVERFLOW) */}
+          <button
+            onClick={() => setCollapsed(true)}
+            className="
+              fixed top-3 right-3 z-[90]
+              bg-white p-2 rounded-lg shadow
+            "
+            aria-label="Close menu"
+          >
+            <XMarkIcon className="w-6 h-6 text-slate-800" />
+          </button>
+
+          {/* MENU CENTER (RESPONSIVE ALL HP SIZE) */}
+          <div className="flex-1 flex items-center justify-center px-4">
+            <div className="flex flex-col gap-4 w-full items-center">
+              {NAV_ITEMS.map((item) => {
+                const active = location.pathname === item.path;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      navigate(item.path);
+                      setCollapsed(true);
+                    }}
+                    className={`
+                      w-[80vw] max-w-[280px]
+                      h-12
+                      flex items-center justify-center gap-2
+                      rounded-xl
+                      text-base font-semibold
+                      transition
+                      ${
+                        active
+                          ? "bg-white text-sky-900"
+                          : "bg-white/15 text-white hover:bg-white/25"
+                      }
+                    `}
+                  >
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* ===== NAVIGATION ===== */}
-      <nav className="flex-1 px-3 py-4 space-y-3">
-        {NAV_ITEMS.map((item) => (
-          <NavButton
-            key={item.id}
-            icon={item.icon}
-            label={item.label}
-            active={active === item.id}
-            collapsed={collapsed}
-            onClick={() => navigate(item.path)}
-          />
-        ))}
-      </nav>
-    </aside>
+      {/* =====================================================
+          DESKTOP SIDEBAR (TIDAK BERUBAH)
+      ===================================================== */}
+      <aside
+        className={`
+          fixed top-0 left-0 h-screen z-50
+          hidden md:flex md:flex-col
+          bg-gradient-to-b from-sky-900 to-sky-300
+          transition-all duration-300
+          ${collapsed ? "w-20" : "w-80"}
+        `}
+      >
+        {/* HEADER */}
+        <div
+          className={`flex flex-col items-center border-b border-white/20
+            ${collapsed ? "py-6" : "px-4 pt-6 pb-5"}
+          `}
+        >
+          <button
+            onClick={toggle}
+            className="w-12 h-15 flex items-center justify-center"
+          >
+            <img
+              src="/logo/perhubungan.png"
+              alt="Logo"
+              className="w-full h-full brightness-0 invert"
+            />
+          </button>
+
+          {!collapsed && (
+            <div className="mt-4 text-center text-white">
+              <div className="text-2xl font-bold">DAMPRAH</div>
+              <div className="text-sm opacity-80 leading-snug">
+                Data Master Pelabuhan Aceh
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* NAV DESKTOP */}
+        <nav className="flex-1 px-3 py-4 space-y-3">
+          {NAV_ITEMS.map((item) => {
+            const active = location.pathname === item.path;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                className={`
+                  w-full rounded-lg transition
+                  ${
+                    collapsed
+                      ? "flex justify-center py-3"
+                      : "flex items-center gap-3 px-3 py-2"
+                  }
+                  ${
+                    active
+                      ? "bg-white text-sky-900"
+                      : "text-white/80 hover:bg-white/10"
+                  }
+                `}
+              >
+                <item.icon className="w-6 h-6 shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }

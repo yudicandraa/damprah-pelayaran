@@ -4,40 +4,40 @@ import { getUserRole, logout } from "../auth/auth";
 
 export default function Header() {
   const navigate = useNavigate();
-  const role = getUserRole(); // "admin" | "user" | null
-  const isAdmin = role === "admin";
-
-  function handleLogout() {
-    logout(); // hapus token
-    navigate("/login", { replace: true });
-  }
+  const isAdmin = getUserRole() === "admin";
 
   return (
     <header className="w-full bg-white border-b shadow-sm">
-      <div
-        className={`
-      max-w-7xl mx-auto py-3
-      px-6 lg:px-8
-      flex items-center justify-between
-    `}
-      >
+      <div className="
+        max-w-7xl mx-auto
+        px-4 py-2
+        md:px-6 md:py-3
+        flex flex-col md:flex-row
+        md:items-center md:justify-between
+        gap-2
+      ">
+       <div
+  className="
+    font-bold text-sm sm:text-base md:text-lg
+    pr-14 md:pr-0
+    leading-tight
+    break-words
+  "
+>
+  Data Master Pelabuhan Penyeberangan Aceh
+</div>
 
-        {/* LEFT */}
+
         <div className="flex items-center gap-3">
-          <div className="text-lg font-bold text-slate-800">
-            Data Master Pelabuhan Penyeberangan Aceh
-          </div>
-
-          <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-600">
+          <span className="text-[10px] md:text-xs px-2 py-1 bg-slate-100 rounded">
             {isAdmin ? "Admin" : "User"}
           </span>
-        </div>
-
-        {/* RIGHT */}
-        <div className="flex items-center gap-4">
           <button
-            onClick={handleLogout}
-            className="text-sm font-medium text-red-600 hover:underline"
+            onClick={() => {
+              logout();
+              navigate("/login", { replace: true });
+            }}
+            className="text-sm text-red-600"
           >
             Logout
           </button>

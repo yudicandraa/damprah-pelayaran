@@ -3,7 +3,6 @@ import path from "path";
 import { db } from "../config/db";
 import fs from "fs";
 import mime from "mime-types";
-
 // ============================
 // LIST DOCUMENTS BY PORT
 // ============================
@@ -56,6 +55,8 @@ export function uploadDocument(req: Request, res: Response) {
 }
 
 // preview document (inline or attachment based on type)
+
+
 export function previewDocument(req: Request, res: Response) {
   const { id } = req.params;
 
@@ -68,30 +69,26 @@ export function previewDocument(req: Request, res: Response) {
       }
 
       const filePath = path.resolve(row.file_path);
-      const mimeType = mime.lookup(filePath) || "application/octet-stream";
 
-      const PREVIEWABLE_MIME = [
-        "application/pdf",
-        "image/png",
-        "image/jpeg",
-        "image/webp",
-        "text/plain",
-      ];
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).end();
+      }
 
-      const isPreviewable = PREVIEWABLE_MIME.includes(mimeType);
+      const mimeType =
+        mime.lookup(filePath) || "application/pdf";
 
-      res.setHeader("Content-Type", mimeType);
-      res.setHeader(
-        "Content-Disposition",
-        `${isPreviewable ? "inline" : "attachment"}; filename="${row.file_name}"`
-      );
+      res.writeHead(200, {
+        "Content-Type": mimeType,
+        "Content-Disposition": `inline; filename="${row.file_name}"`,
+        "Accept-Ranges": "bytes",
+      });
 
-      fs.createReadStream(filePath)
-        .on("error", () => res.status(500).end())
-        .pipe(res);
+      fs.createReadStream(filePath).pipe(res);
     }
   );
 }
+
+
 
 
 
