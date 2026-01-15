@@ -1,4 +1,3 @@
-// src/app.ts
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -9,19 +8,20 @@ import documentRoutes from "./routes/document.routes";
 const app = express();
 
 // ======================
-// MIDDLEWARE GLOBAL
+// MIDDLEWARE
 // ======================
-app.use(cors());
+app.use(cors({
+  origin: "*", // ganti domain frontend jika sudah fix
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ======================
-// STATIC FILE (DOWNLOAD)
+// STATIC FILES
 // ======================
-app.use(
-  "/files",
-  express.static(path.join(process.cwd(), "uploads"))
-);
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // ======================
 // ROUTES
@@ -30,10 +30,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
 
 // ======================
-// HEALTH CHECK
+// 404 HANDLER
 // ======================
-app.get("/", (_req, res) => {
-  res.json({ status: "Backend running" });
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route tidak ditemukan",
+    path: req.originalUrl,
+  });
 });
 
-export default app;
+export default app; // 🔥 INI YANG SEBELUMNYA HILANG

@@ -1,35 +1,28 @@
 import { Router } from "express";
 import {
-  uploadDocument,
   getDocumentsByPort,
+  uploadDocument,
   previewDocument,
   downloadDocument,
   deleteDocument,
 } from "../controllers/document.controller";
-import { upload } from "../middleware/upload";
-import { requireAuth } from "../middleware/auth";
-import { requireAdmin } from "../middleware/admin";
+import { authMiddleware } from "../middleware/auth";
+import { upload } from "../middleware/upload"; // ⬅️ HARUS ADA
 
 const router = Router();
 
-router.get("/:portId", requireAuth, getDocumentsByPort);
+router.get("/:portId", authMiddleware, getDocumentsByPort);
 
+// 🔥 INI KRUSIAL
 router.post(
   "/upload",
-  requireAuth,
-  requireAdmin,
-  upload.single("file"),
+  authMiddleware,
+  upload.single("file"), // ⬅️ TANPA INI = Failed to fetch
   uploadDocument
 );
 
-router.get("/preview/:id", previewDocument);
-router.get("/download/:id", requireAuth, downloadDocument);
-
-router.delete(
-  "/file/:id",
-  requireAuth,
-  requireAdmin,
-  deleteDocument
-);
+router.get("/preview/:id", authMiddleware, previewDocument);
+router.get("/download/:id", authMiddleware, downloadDocument);
+router.delete("/file/:id", authMiddleware, deleteDocument);
 
 export default router;

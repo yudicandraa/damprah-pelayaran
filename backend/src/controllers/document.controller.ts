@@ -55,8 +55,6 @@ export function uploadDocument(req: Request, res: Response) {
 }
 
 // preview document (inline or attachment based on type)
-
-
 export function previewDocument(req: Request, res: Response) {
   const { id } = req.params;
 
@@ -89,9 +87,6 @@ export function previewDocument(req: Request, res: Response) {
 }
 
 
-
-
-
 // ============================
 // DOWNLOAD DOCUMENT (ATTACHMENT)
 // ============================
@@ -121,19 +116,50 @@ export function deleteDocument(req: Request, res: Response) {
     `SELECT file_path FROM documents WHERE id = ?`,
     [id],
     (err, row: any) => {
+      if (err) {
+        console.error("DB SELECT ERROR:", err);
+        return res.status(500).json({ message: "Database error (select)" });
+      }
+
       if (!row) {
         return res.status(404).json({ message: "File tidak ditemukan" });
       }
 
+      // 🔥 PENTING: pastikan path absolut ke folder uploads
+      const uploadsRoot = path.resolve(__dirname, "../../uploads");
+      const absolutePath = path.isAbsolute(row.file_path)
+        ? row.file_path
+        : path.join(uploadsRoot, path.basename(row.file_path));
+
+      console.log("DELETE FILE PATH:", absolutePath);
+
+      // 1️⃣ Hapus file fisik (jika ada)
+      if (fs.existsSync(absolutePath)) {
+        try {
+          fs.unlinkSync(absolutePath);
+        } catch (fsErr) {
+          console.error("FS DELETE ERROR:", fsErr);
+          return res
+            .status(500)
+            .json({ message: "Gagal menghapus file fisik" });
+        }
+      } else {
+        console.warn("FILE TIDAK ADA DI DISK:", absolutePath);
+      }
+
+      // 2️⃣ Hapus record DB
       db.run(
         `DELETE FROM documents WHERE id = ?`,
         [id],
         (err2) => {
           if (err2) {
-            console.error(err2);
-            return res.status(500).json({ message: "Gagal menghapus" });
+            console.error("DB DELETE ERROR:", err2);
+            return res
+              .status(500)
+              .json({ message: "Gagal menghapus data di database" });
           }
-          res.json({ message: "File dihapus" });
+
+          res.json({ message: "File berhasil dihapus" });
         }
       );
     }

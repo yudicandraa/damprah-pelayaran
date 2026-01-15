@@ -1,19 +1,21 @@
 import multer from "multer";
-import fs from "fs";
 import path from "path";
+import fs from "fs";
 
-const tempDir = path.join(process.cwd(), "uploads", "temp");
-fs.mkdirSync(tempDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination(req, file, cb) {
+    const dir = path.join(__dirname, "../../uploads");
 
-export const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      // ⛔ JANGAN PAKAI req.body DI SINI
-      cb(null, tempDir);
-    },
-    filename: (_req, file, cb) => {
-      const safeName = file.originalname.replace(/\s+/g, "_");
-      cb(null, `${Date.now()}_${safeName}`);
-    },
-  }),
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    cb(null, dir);
+  },
+  filename(req, file, cb) {
+    const unique = Date.now() + "-" + file.originalname;
+    cb(null, unique);
+  },
 });
+
+export const upload = multer({ storage });

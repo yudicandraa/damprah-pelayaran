@@ -32,7 +32,7 @@ export default function PortDetail({ ports }: any) {
 
   async function loadDocuments() {
     const res = await fetch(
-      `http://localhost:4000/api/documents/${port.id}`,
+      `http://123.108.102.69:4000/api/documents/${port.id}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
     setDocuments(await res.json());
@@ -48,26 +48,53 @@ export default function PortDetail({ ports }: any) {
     form.append("portId", port.id);
     form.append("templateId", templateId);
 
-    await fetch("http://localhost:4000/api/documents/upload", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      body: form,
-    });
+    const res = await fetch(
+      "http://123.108.102.69:4000/api/documents/upload",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: form,
+      }
+    );
 
+    if (!res.ok) {
+      const err = await res.text();
+      alert("Upload gagal: " + err);
+      return;
+    }
+
+    alert("Upload berhasil");
     loadDocuments();
   }
 
-  function preview(file: FileItem) {
-    const token = localStorage.getItem("token");
-    window.open(
-      `http://localhost:4000/api/documents/preview/${file.id}?token=${token}`,
-      "_blank"
+
+  async function preview(file: FileItem) {
+    const res = await fetch(
+      `http://123.108.102.69:4000/api/documents/preview/${file.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
     );
+
+    if (!res.ok) {
+      alert("Gagal preview");
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url);
   }
+
+
 
   async function download(file: FileItem) {
     const res = await fetch(
-      `http://localhost:4000/api/documents/download/${file.id}`,
+      `http://123.108.102.69:4000/api/documents/download/${file.id}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
     const blob = await res.blob();
@@ -77,6 +104,28 @@ export default function PortDetail({ ports }: any) {
     a.download = file.file_name;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function deleteFile(file: FileItem) {
+    if (!confirm("Hapus file ini?")) return;
+
+    const res = await fetch(
+      `http://123.108.102.69:4000/api/documents/file/${file.id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      alert("Gagal menghapus file");
+      return;
+    }
+
+    alert("File berhasil dihapus");
+    loadDocuments();
   }
 
   const rows = documentTemplates.map((tpl) => ({
@@ -171,7 +220,10 @@ export default function PortDetail({ ports }: any) {
                             <ArrowDownTrayIcon className="w-4 h-4" />
                           </button>
                           {isAdmin && (
-                            <TrashIcon className="w-4 h-4 text-red-600" />
+                            <button onClick={() => deleteFile(f)}>
+                              <TrashIcon className="w-4 h-4 text-red-600" />
+                            </button>
+
                           )}
                         </div>
                       </td>

@@ -1,33 +1,32 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export function requireAuth(
+const JWT_SECRET = process.env.JWT_SECRET || "secret123";
+
+export function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  // 1️⃣ Ambil token dari QUERY dulu
-  const queryToken = req.query.token as string | undefined;
+  let token: string | undefined;
 
-  // 2️⃣ Ambil token dari HEADER (fallback)
-  const authHeader = req.headers.authorization;
-  const headerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.split(" ")[1]
-    : undefined;
+  // 1️⃣ Header Authorization
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    token = req.headers.authorization.replace("Bearer ", "");
+  }
 
-  const token = queryToken || headerToken;
+  // 2️⃣ (OPSIONAL) token di query (kalau masih dipakai)
+  if (!token && req.query.token) {
+    token = String(req.query.token);
+  }
 
   if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return res.status(401).json({ message: "Token tidak ditemukan" });
   }
 
   try {
-    const payload = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    );
-
-    (req as any).user = payload;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    (req as any).user = decoded;
     next();
   } catch (err) {
     return res.status(401).json({ message: "Token tidak valid" });
