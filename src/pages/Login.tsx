@@ -10,20 +10,29 @@ export default function Login() {
     setLoading(true);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000); // ⏱ 7 detik max
+    const timeout = setTimeout(() => controller.abort(), 7000); // ⏱ max 7 detik
 
     try {
-      const res = await fetch("http://123.108.102.69:4000/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email, password }),
         signal: controller.signal,
       });
 
+      // response bisa bukan JSON (misalnya error nginx)
+      if (!res.ok) {
+        const text = await res.text();
+        alert(text || "Login gagal");
+        return;
+      }
+
       const data = await res.json();
 
-      if (!res.ok) {
-        alert(data.message || "Login gagal");
+      if (!data.token) {
+        alert("Token tidak diterima dari server");
         return;
       }
 

@@ -30,26 +30,68 @@ export default function DocumentTable({
   const [loading, setLoading] = useState(false);
 
   // ============================
+  // HELPER: fetch dengan timeout
+  // ============================
+  async function fetchWithTimeout(
+    url: string,
+    options: RequestInit,
+    timeout = 30000 // 30 detik
+  ) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      return res;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  // ============================
   // UPLOAD FILE
   // ============================
   async function upload(templateId: string, file: File) {
     setLoading(true);
 
-    const form = new FormData();
-    form.append("file", file);
-    form.append("portId", portId);
-    form.append("templateId", templateId);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("portId", portId);
+      form.append("templateId", templateId);
 
-    await fetch("http://123.108.102.69:4000/api/documents/upload", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: form,
-    });
+      const res = await fetchWithTimeout(
+        "/api/documents/upload",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: form,
+        },
+        60000 // upload bisa lama → 60 detik
+      );
 
-    setLoading(false);
-    onChanged?.();
+      if (!res.ok) {
+        const text = await res.text();
+        alert("Upload gagal: " + text);
+        return;
+      }
+
+      onChanged?.();
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        alert("Upload terlalu lama (timeout)");
+      } else {
+        alert("Gagal upload file");
+      }
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // ============================
@@ -58,41 +100,58 @@ export default function DocumentTable({
   async function deleteFile(id: number) {
     if (!confirm("Hapus file ini?")) return;
 
-    await fetch(
-      `http://123.108.102.69:4000/api/documents/file/${id}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/file/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
-      }
-    );
+        15000
+      );
 
-    onChanged?.();
+      if (!res.ok) {
+        const text = await res.text();
+        alert("Gagal menghapus file: " + text);
+        return;
+      }
+
+      onChanged?.();
+    } catch (err) {
+      alert("Gagal menghapus file");
+      console.error(err);
+    }
   }
 
   // ============================
   // PREVIEW FILE (NEW TAB)
   // ============================
   async function previewFile(id: number) {
-    const res = await fetch(
-      `http://123.108.102.69:4000/api/documents/preview/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/preview/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
+        30000
+      );
+
+      if (!res.ok) {
+        alert("Gagal membuka file");
+        return;
       }
-    );
 
-    if (!res.ok) {
-      alert("Gagal membuka file");
-      return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (err) {
+      alert("Gagal preview file");
+      console.error(err);
     }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank");
   }
 
   return (
@@ -120,10 +179,11 @@ export default function DocumentTable({
                 <td className="p-2">
                   <label className="cursor-pointer text-xs flex items-center gap-1">
                     <CloudArrowUpIcon className="w-4 h-4" />
-                    Upload
+                    {loading ? "Mengunggah..." : "Upload"}
                     <input
                       type="file"
                       className="hidden"
+                      disabled={loading}
                       onChange={(e) =>
                         e.target.files &&
                         upload(r.templateId, e.target.files[0])

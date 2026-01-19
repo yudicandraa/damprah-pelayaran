@@ -29,118 +29,205 @@ export default function PortDetail({ ports }: any) {
 
   const [documents, setDocuments] = useState<any[]>([]);
   const [openRow, setOpenRow] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
+  // ============================
+  // HELPER: fetch + timeout
+  // ============================
+  async function fetchWithTimeout(
+    url: string,
+    options: RequestInit,
+    timeout = 30000
+  ) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  // ============================
+  // LOAD DOCUMENTS
+  // ============================
   async function loadDocuments() {
-    const res = await fetch(
-      `http://123.108.102.69:4000/api/documents/${port.id}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-    );
-    setDocuments(await res.json());
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/${port.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+        15000
+      );
+
+      if (!res.ok) {
+        const text = await res.text();
+        alert("Gagal memuat dokumen: " + text);
+        return;
+      }
+
+      setDocuments(await res.json());
+    } catch (err) {
+      alert("Gagal memuat dokumen");
+      console.error(err);
+    }
   }
 
   useEffect(() => {
     loadDocuments();
   }, [port.id]);
 
+  // ============================
+  // UPLOAD FILE
+  // ============================
   async function uploadFile(templateId: string, file: File) {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("portId", port.id);
-    form.append("templateId", templateId);
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("portId", port.id);
+      form.append("templateId", templateId);
 
-    const res = await fetch(
-      "http://123.108.102.69:4000/api/documents/upload",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const res = await fetchWithTimeout(
+        "/api/documents/upload",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: form,
         },
-        body: form,
+        60000 // upload bisa lama
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        alert("Upload gagal: " + err);
+        return;
       }
-    );
 
-    if (!res.ok) {
-      const err = await res.text();
-      alert("Upload gagal: " + err);
-      return;
+      alert("Upload berhasil");
+      loadDocuments();
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        alert("Upload terlalu lama (timeout)");
+      } else {
+        alert("Upload gagal");
+      }
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    alert("Upload berhasil");
-    loadDocuments();
   }
 
-
+  // ============================
+  // PREVIEW FILE
+  // ============================
   async function preview(file: FileItem) {
-    const res = await fetch(
-      `http://123.108.102.69:4000/api/documents/preview/${file.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/preview/${file.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
+        30000
+      );
+
+      if (!res.ok) {
+        alert("Gagal preview");
+        return;
       }
-    );
 
-    if (!res.ok) {
-      alert("Gagal preview");
-      return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (err) {
+      alert("Gagal preview file");
+      console.error(err);
     }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url);
   }
 
-
-
+  // ============================
+  // DOWNLOAD FILE
+  // ============================
   async function download(file: FileItem) {
-    const res = await fetch(
-      `http://123.108.102.69:4000/api/documents/download/${file.id}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-    );
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.file_name;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/download/${file.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+        30000
+      );
+
+      if (!res.ok) {
+        alert("Gagal download");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.file_name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Gagal download file");
+      console.error(err);
+    }
   }
 
+  // ============================
+  // DELETE FILE
+  // ============================
   async function deleteFile(file: FileItem) {
     if (!confirm("Hapus file ini?")) return;
 
-    const res = await fetch(
-      `http://123.108.102.69:4000/api/documents/file/${file.id}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+    try {
+      const res = await fetchWithTimeout(
+        `/api/documents/file/${file.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         },
+        15000
+      );
+
+      if (!res.ok) {
+        alert("Gagal menghapus file");
+        return;
       }
-    );
 
-    if (!res.ok) {
+      alert("File berhasil dihapus");
+      loadDocuments();
+    } catch (err) {
       alert("Gagal menghapus file");
-      return;
+      console.error(err);
     }
-
-    alert("File berhasil dihapus");
-    loadDocuments();
   }
 
   const rows = documentTemplates.map((tpl) => ({
     ...tpl,
-    files: documents.filter((d) => String(d.template_id) === String(tpl.id)),
+    files: documents.filter(
+      (d) => String(d.template_id) === String(tpl.id)
+    ),
   }));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* HERO */}
       <div className="relative rounded-xl overflow-hidden">
-        <img
-          src={port.hero}
-          className="w-full h-48 sm:h-56 object-cover"
-        />
+        <img src={port.hero} className="w-full h-48 sm:h-56 object-cover" />
         <button
           onClick={() => navigate(-1)}
           className="absolute top-4 left-4 bg-white p-2 rounded-full"
@@ -168,17 +255,20 @@ export default function PortDetail({ ports }: any) {
                       Sudah Unggah ({r.files.length})
                     </button>
                   ) : (
-                    <span className="text-slate-400 text-xs">Belum Unggah</span>
+                    <span className="text-slate-400 text-xs">
+                      Belum Unggah
+                    </span>
                   )}
                 </td>
                 {isAdmin && (
                   <td className="p-3">
                     <label className="cursor-pointer flex items-center gap-1 text-xs text-sky-600">
                       <CloudArrowUpIcon className="w-4 h-4" />
-                      Upload
+                      {loading ? "Mengunggah..." : "Upload"}
                       <input
                         type="file"
                         hidden
+                        disabled={loading}
                         onChange={(e) =>
                           e.target.files &&
                           uploadFile(r.id, e.target.files[0])
@@ -197,8 +287,7 @@ export default function PortDetail({ ports }: any) {
       {openRow && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-4 sm:p-6
-              w-[95%] sm:w-[720px] max-h-[90vh] overflow-auto">
+            <div className="bg-white rounded-xl p-4 sm:p-6 w-[95%] sm:w-[720px] max-h-[90vh] overflow-auto">
               <div className="flex justify-between mb-4">
                 <h3 className="font-bold">{openRow.title}</h3>
                 <button onClick={() => setOpenRow(null)}>
@@ -223,7 +312,6 @@ export default function PortDetail({ ports }: any) {
                             <button onClick={() => deleteFile(f)}>
                               <TrashIcon className="w-4 h-4 text-red-600" />
                             </button>
-
                           )}
                         </div>
                       </td>
