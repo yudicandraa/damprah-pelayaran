@@ -9,13 +9,15 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000); // ⏱ 7 detik max
+
     try {
       const res = await fetch("http://123.108.102.69:4000/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
 
       const data = await res.json();
@@ -27,10 +29,15 @@ export default function Login() {
 
       localStorage.setItem("token", data.token);
       window.location.href = "/";
-    } catch (err) {
-      console.error("FETCH ERROR:", err);
-      alert("Tidak bisa terhubung ke backend");
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        alert("Login terlalu lama. Server lambat.");
+      } else {
+        alert("Tidak bisa terhubung ke server");
+      }
+      console.error("LOGIN ERROR:", err);
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }
@@ -38,67 +45,31 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100">
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
-        {/* Logo & Title */}
-        <div className="flex flex-col items-center mb-6">
-          <img
-            src="../../logo/dishub.png"
-            alt="DAMPRAH Logo"
-            className="w-20 h-30 mb-3"
-          />
-          <h1 className="text-2xl font-extrabold text-slate-800">
-            DAMPRAH
-          </h1>
-          <p className="text-sm text-slate-500 text-center">
-            Data Master Pelabuhan Penyeberangan Aceh
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-center mb-6">Login</h1>
 
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              placeholder="Masukkan email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          />
 
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="Masukkan password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-            <div className="text-right mt-1">
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-sky-600"
-              >
-                Lupa Password
-              </button>
-            </div>
-          </div>
+          <input
+            type="password"
+            placeholder="Password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 rounded-md text-white font-semibold
-  bg-gradient-to-r from-[#9ECAD6] to-[#113F67]
-  hover:from-[#8ABBC9] hover:to-[#0E3456]
-  disabled:opacity-60 transition"
-
+            className="w-full bg-sky-600 text-white py-2 rounded disabled:opacity-60"
           >
             {loading ? "Memproses..." : "Masuk"}
           </button>

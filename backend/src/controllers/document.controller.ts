@@ -29,29 +29,49 @@ export function getDocumentsByPort(req: Request, res: Response) {
 // UPLOAD DOCUMENT (LOCAL)
 // ============================
 export function uploadDocument(req: Request, res: Response) {
-  const file = req.file;
-  const { portId, templateId } = req.body;
-  const user = (req as any).user;
+  console.time("UPLOAD");
 
-  if (!file) {
-    return res.status(400).json({ message: "File tidak ditemukan" });
-  }
-
-  const filePath = file.path.replace(/\\/g, "/");
-
-  db.run(
-    `INSERT INTO documents 
-     (port_id, template_id, file_name, file_path, uploaded_by)
-     VALUES (?,?,?,?,?)`,
-    [portId, templateId, file.originalname, filePath, user?.id ?? "admin"],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Database error" });
-      }
-      res.json({ message: "Upload berhasil", id: this.lastID });
+  try {
+    if (!req.file) {
+      console.timeEnd("UPLOAD");
+      return res.status(400).send("File tidak ditemukan");
     }
-  );
+
+    const { portId, templateId } = req.body;
+
+    if (!portId || !templateId) {
+      console.timeEnd("UPLOAD");
+      return res.status(400).send("Data tidak lengkap");
+    }
+
+    const fileName = req.file.originalname;
+    const filePath = req.file.filename;
+
+    const sql = `
+      INSERT OR REPLACE INTO documents
+      (port_id, template_id, file_name, file_path)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    db.run(
+      sql,
+      [portId, templateId, fileName, filePath],
+      function (err) {
+        if (err) {
+          console.error("UPLOAD DB ERROR:", err);
+          console.timeEnd("UPLOAD");
+          return res.status(500).send("Gagal simpan data");
+        }
+
+        console.timeEnd("UPLOAD");
+        return res.json({ message: "Upload berhasil" });
+      }
+    );
+  } catch (e) {
+    console.error("UPLOAD ERROR:", e);
+    console.timeEnd("UPLOAD");
+    return res.status(500).send("Server error");
+  }
 }
 
 // preview document (inline or attachment based on type)

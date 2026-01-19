@@ -1,10 +1,12 @@
-import dotenv from "dotenv";
-dotenv.config(); // ← HARUS DI ATAS
-
+import http from "http";
 import app from "./app";
 
-const PORT = 4000;
+const server = http.createServer(app);
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// 🔥 KEEP ALIVE FIX
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
+server.listen(4000, () => {
+  console.log("Server running on port 4000");
 });
