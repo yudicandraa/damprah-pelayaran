@@ -4,12 +4,19 @@ import {
   GlobeAltIcon,
   Bars3Icon,
   XMarkIcon,
+  VideoCameraIcon,
 } from "@heroicons/react/24/solid";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
   { id: "home", icon: HomeIcon, label: "Beranda", path: "/" },
   { id: "pelabuhan", icon: GlobeAltIcon, label: "Pelabuhan", path: "/pelabuhan" },
+  {
+    id: "cctv",
+    icon: VideoCameraIcon,
+    label: "Pantau CCTV",
+    path: "/cctv",
+  },
 ];
 
 export default function SidebarOptimized({
@@ -29,9 +36,7 @@ export default function SidebarOptimized({
 
   return (
     <>
-      {/* =====================================================
-          HAMBURGER BUTTON (KANAN ATAS - MOBILE)
-      ===================================================== */}
+      {/* HAMBURGER BUTTON (MOBILE) */}
       <button
         onClick={toggle}
         className="
@@ -48,11 +53,7 @@ export default function SidebarOptimized({
         )}
       </button>
 
-      {/* =====================================================
-          MOBILE FULLSCREEN SIDEBAR
-          - pakai 100dvh → TIDAK kepanjangan di mobile
-          - tidak ikut halaman utama
-      ===================================================== */}
+      {/* MOBILE FULLSCREEN SIDEBAR */}
       {!collapsed && (
         <div
           className="
@@ -64,7 +65,6 @@ export default function SidebarOptimized({
             overscroll-contain
           "
         >
-          {/* CLOSE BUTTON (FIXED → ANTI OVERFLOW) */}
           <button
             onClick={() => setCollapsed(true)}
             className="
@@ -76,7 +76,6 @@ export default function SidebarOptimized({
             <XMarkIcon className="w-6 h-6 text-slate-800" />
           </button>
 
-          {/* MENU CENTER (RESPONSIVE ALL HP SIZE) */}
           <div className="flex-1 flex items-center justify-center px-4">
             <div className="flex flex-col gap-4 w-full items-center">
               {NAV_ITEMS.map((item) => {
@@ -112,9 +111,7 @@ export default function SidebarOptimized({
         </div>
       )}
 
-      {/* =====================================================
-          DESKTOP SIDEBAR (TIDAK BERUBAH)
-      ===================================================== */}
+      {/* DESKTOP SIDEBAR */}
       <aside
         className={`
           fixed top-0 left-0 h-screen z-50
@@ -124,7 +121,6 @@ export default function SidebarOptimized({
           ${collapsed ? "w-20" : "w-80"}
         `}
       >
-        {/* HEADER */}
         <div
           className={`flex flex-col items-center border-b border-white/20
             ${collapsed ? "py-6" : "px-4 pt-6 pb-5"}
@@ -145,13 +141,12 @@ export default function SidebarOptimized({
             <div className="mt-4 text-center text-white">
               <div className="text-2xl font-bold">DAMPRAH</div>
               <div className="text-sm opacity-80 leading-snug">
-                Data Master Pelabuhan Aceh
+                Data Master Pelabuhan Penyeberangan Aceh
               </div>
             </div>
           )}
         </div>
 
-        {/* NAV DESKTOP */}
         <nav className="flex-1 px-3 py-4 space-y-3">
           {NAV_ITEMS.map((item) => {
             const active = location.pathname === item.path;

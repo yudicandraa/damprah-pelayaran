@@ -1,4 +1,3 @@
-// src/components/PortDetail.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -29,50 +28,48 @@ export default function PortDetail({ ports }: any) {
 
   const [documents, setDocuments] = useState<any[]>([]);
   const [openRow, setOpenRow] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  // ============================
-  // HELPER: fetch + timeout
-  // ============================
-  async function fetchWithTimeout(
-    url: string,
-    options: RequestInit,
-    timeout = 30000
-  ) {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), timeout);
-    try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(t);
-    }
+  // upload progress
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // modal state
+  const [modal, setModal] = useState<{
+    type: "success" | "error" | "confirm" | null;
+    message: string;
+    onConfirm?: () => void;
+  }>({ type: null, message: "" });
+
+  /* =========================
+     HELPERS
+  ========================= */
+  function openSuccess(msg: string) {
+    setModal({ type: "success", message: msg });
   }
 
-  // ============================
-  // LOAD DOCUMENTS
-  // ============================
+  function openError(msg: string) {
+    setModal({ type: "error", message: msg });
+  }
+
+  function openConfirm(msg: string, onConfirm: () => void) {
+    setModal({ type: "confirm", message: msg, onConfirm });
+  }
+
+  /* =========================
+     LOAD DOCUMENTS
+  ========================= */
   async function loadDocuments() {
     try {
-      const res = await fetchWithTimeout(
-        `/api/documents/${port.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+      const res = await fetch(`/api/documents/${port.id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        15000
-      );
+      });
 
-      if (!res.ok) {
-        const text = await res.text();
-        alert("Gagal memuat dokumen: " + text);
-        return;
-      }
-
+      if (!res.ok) throw new Error();
       setDocuments(await res.json());
-    } catch (err) {
-      alert("Gagal memuat dokumen");
-      console.error(err);
+    } catch {
+      openError("Gagal memuat dokumen");
     }
   }
 
@@ -80,140 +77,118 @@ export default function PortDetail({ ports }: any) {
     loadDocuments();
   }, [port.id]);
 
-  // ============================
-  // UPLOAD FILE
-  // ============================
+  /* =========================
+     UPLOAD WITH PROGRESS
+  ========================= */
   async function uploadFile(templateId: string, file: File) {
-    setLoading(true);
+    setUploading(true);
+    setProgress(0);
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("portId", port.id);
+    form.append("templateId", templateId);
+
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("portId", port.id);
-      form.append("templateId", templateId);
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/documents/upload");
+        xhr.setRequestHeader(
+          "Authorization",
+          `Bearer ${localStorage.getItem("token")}`
+        );
 
-      const res = await fetchWithTimeout(
-        "/api/documents/upload",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: form,
-        },
-        60000 // upload bisa lama
-      );
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
 
-      if (!res.ok) {
-        const err = await res.text();
-        alert("Upload gagal: " + err);
-        return;
-      }
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject();
 
-      alert("Upload berhasil");
-      loadDocuments();
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        alert("Upload terlalu lama (timeout)");
-      } else {
-        alert("Upload gagal");
-      }
-      console.error(err);
+        xhr.onerror = () => reject();
+        xhr.send(form);
+      });
+
+      await loadDocuments();
+      openSuccess("Upload berhasil");
+    } catch {
+      openError("Upload gagal");
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setUploading(false);
+        setProgress(0);
+      }, 500);
     }
   }
 
-  // ============================
-  // PREVIEW FILE
-  // ============================
+  /* =========================
+     PREVIEW & DOWNLOAD
+  ========================= */
   async function preview(file: FileItem) {
     try {
-      const res = await fetchWithTimeout(
-        `/api/documents/preview/${file.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+      const res = await fetch(`/api/documents/preview/${file.id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        30000
-      );
-
-      if (!res.ok) {
-        alert("Gagal preview");
-        return;
-      }
+      });
+      if (!res.ok) throw new Error();
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
-    } catch (err) {
-      alert("Gagal preview file");
-      console.error(err);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      openError("Gagal membuka file");
     }
   }
 
-  // ============================
-  // DOWNLOAD FILE
-  // ============================
   async function download(file: FileItem) {
     try {
-      const res = await fetchWithTimeout(
-        `/api/documents/download/${file.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+      const res = await fetch(`/api/documents/download/${file.id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        30000
-      );
-
-      if (!res.ok) {
-        alert("Gagal download");
-        return;
-      }
+      });
+      if (!res.ok) throw new Error();
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = file.file_name;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Gagal download file");
-      console.error(err);
+    } catch {
+      openError("Gagal download file");
     }
   }
 
-  // ============================
-  // DELETE FILE
-  // ============================
-  async function deleteFile(file: FileItem) {
-    if (!confirm("Hapus file ini?")) return;
-
-    try {
-      const res = await fetchWithTimeout(
-        `/api/documents/file/${file.id}`,
-        {
+  /* =========================
+     DELETE WITH CONFIRM MODAL
+  ========================= */
+  function deleteFile(file: FileItem) {
+    openConfirm("Yakin ingin menghapus file ini?", async () => {
+      try {
+        const res = await fetch(`/api/documents/file/${file.id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        },
-        15000
-      );
+        });
+        if (!res.ok) throw new Error();
 
-      if (!res.ok) {
-        alert("Gagal menghapus file");
-        return;
+        await loadDocuments();
+        openSuccess("File berhasil dihapus");
+      } catch {
+        openError("Gagal menghapus file");
       }
-
-      alert("File berhasil dihapus");
-      loadDocuments();
-    } catch (err) {
-      alert("Gagal menghapus file");
-      console.error(err);
-    }
+    });
   }
 
   const rows = documentTemplates.map((tpl) => ({
@@ -227,20 +202,20 @@ export default function PortDetail({ ports }: any) {
     <div className="max-w-7xl mx-auto space-y-6">
       {/* HERO */}
       <div className="relative rounded-xl overflow-hidden">
-        <img src={port.hero} className="w-full h-48 sm:h-56 object-cover" />
+        <img src={port.hero} className="w-full h-48 object-cover" />
         <button
           onClick={() => navigate(-1)}
           className="absolute top-4 left-4 bg-white p-2 rounded-full"
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
-        <h1 className="absolute bottom-4 left-4 text-2xl sm:text-4xl text-white font-bold">
+        <h1 className="absolute bottom-4 left-4 text-3xl text-white font-bold">
           {port.name}
         </h1>
       </div>
 
       {/* TABLE */}
-      <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
+      <div className="bg-white rounded-lg shadow p-4">
         <table className="w-full text-sm">
           <tbody>
             {rows.map((r) => (
@@ -264,11 +239,11 @@ export default function PortDetail({ ports }: any) {
                   <td className="p-3">
                     <label className="cursor-pointer flex items-center gap-1 text-xs text-sky-600">
                       <CloudArrowUpIcon className="w-4 h-4" />
-                      {loading ? "Mengunggah..." : "Upload"}
+                      Upload
                       <input
                         type="file"
                         hidden
-                        disabled={loading}
+                        disabled={uploading}
                         onChange={(e) =>
                           e.target.files &&
                           uploadFile(r.id, e.target.files[0])
@@ -283,11 +258,11 @@ export default function PortDetail({ ports }: any) {
         </table>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL FILE LIST */}
       {openRow && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-4 sm:p-6 w-[95%] sm:w-[720px] max-h-[90vh] overflow-auto">
+            <div className="bg-white rounded-xl p-6 w-[720px] max-h-[90vh] overflow-auto">
               <div className="flex justify-between mb-4">
                 <h3 className="font-bold">{openRow.title}</h3>
                 <button onClick={() => setOpenRow(null)}>
@@ -319,6 +294,73 @@ export default function PortDetail({ ports }: any) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* UPLOAD PROGRESS */}
+      {uploading && (
+        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 w-72">
+          <p className="text-sm font-semibold mb-2">
+            Mengunggah… {progress}%
+          </p>
+          <div className="w-full h-2 bg-gray-200 rounded">
+            <div
+              className="h-2 bg-sky-600 rounded transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* GLOBAL MODAL */}
+      {modal.type && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-[90%] max-w-md text-center">
+              <h3 className="font-bold text-lg mb-3">
+                {modal.type === "success"
+                  ? "Berhasil"
+                  : modal.type === "error"
+                  ? "Terjadi Kesalahan"
+                  : "Konfirmasi"}
+              </h3>
+
+              <p className="text-sm mb-6">{modal.message}</p>
+
+              <div className="flex justify-center gap-3">
+                {modal.type === "confirm" ? (
+                  <>
+                    <button
+                      className="px-4 py-2 bg-gray-200 rounded"
+                      onClick={() =>
+                        setModal({ type: null, message: "" })
+                      }
+                    >
+                      Batal
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-red-600 text-white rounded"
+                      onClick={() => {
+                        modal.onConfirm?.();
+                        setModal({ type: null, message: "" });
+                      }}
+                    >
+                      Hapus
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="px-6 py-2 bg-sky-600 text-white rounded"
+                    onClick={() =>
+                      setModal({ type: null, message: "" })
+                    }
+                  >
+                    OK
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </ModalPortal>

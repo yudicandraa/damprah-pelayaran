@@ -3,6 +3,9 @@ import path from "path";
 import { db } from "../config/db";
 import fs from "fs";
 import mime from "mime-types";
+const UPLOADS_DIR = path.resolve(__dirname, "../../uploads");
+
+
 // ============================
 // LIST DOCUMENTS BY PORT
 // ============================
@@ -86,22 +89,24 @@ export function previewDocument(req: Request, res: Response) {
         return res.status(404).json({ message: "File tidak ditemukan" });
       }
 
-      const filePath = path.resolve(row.file_path);
+      const absolutePath = path.join(UPLOADS_DIR, row.file_path);
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).end();
+      if (!fs.existsSync(absolutePath)) {
+        console.error("PREVIEW FILE NOT FOUND:", absolutePath);
+        return res.status(404).json({ message: "File tidak ada di server" });
       }
 
       const mimeType =
-        mime.lookup(filePath) || "application/pdf";
+        mime.lookup(absolutePath) || "application/octet-stream";
 
-      res.writeHead(200, {
-        "Content-Type": mimeType,
-        "Content-Disposition": `inline; filename="${row.file_name}"`,
-        "Accept-Ranges": "bytes",
-      });
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${row.file_name}"`
+      );
+      res.setHeader("Accept-Ranges", "bytes");
 
-      fs.createReadStream(filePath).pipe(res);
+      fs.createReadStream(absolutePath).pipe(res);
     }
   );
 }
@@ -121,10 +126,18 @@ export function downloadDocument(req: Request, res: Response) {
         return res.status(404).json({ message: "File tidak ditemukan" });
       }
 
-      res.download(path.resolve(row.file_path), row.file_name);
+      const absolutePath = path.join(UPLOADS_DIR, row.file_path);
+
+      if (!fs.existsSync(absolutePath)) {
+        console.error("DOWNLOAD FILE NOT FOUND:", absolutePath);
+        return res.status(404).json({ message: "File tidak ada di server" });
+      }
+
+      res.download(absolutePath, row.file_name);
     }
   );
 }
+
 
 // ============================
 // DELETE DOCUMENT
@@ -136,47 +149,24 @@ export function deleteDocument(req: Request, res: Response) {
     `SELECT file_path FROM documents WHERE id = ?`,
     [id],
     (err, row: any) => {
-      if (err) {
-        console.error("DB SELECT ERROR:", err);
-        return res.status(500).json({ message: "Database error (select)" });
-      }
-
-      if (!row) {
+      if (err || !row) {
         return res.status(404).json({ message: "File tidak ditemukan" });
       }
 
-      // 🔥 PENTING: pastikan path absolut ke folder uploads
-      const uploadsRoot = path.resolve(__dirname, "../../uploads");
-      const absolutePath = path.isAbsolute(row.file_path)
-        ? row.file_path
-        : path.join(uploadsRoot, path.basename(row.file_path));
+      const absolutePath = path.join(UPLOADS_DIR, row.file_path);
 
-      console.log("DELETE FILE PATH:", absolutePath);
-
-      // 1️⃣ Hapus file fisik (jika ada)
       if (fs.existsSync(absolutePath)) {
-        try {
-          fs.unlinkSync(absolutePath);
-        } catch (fsErr) {
-          console.error("FS DELETE ERROR:", fsErr);
-          return res
-            .status(500)
-            .json({ message: "Gagal menghapus file fisik" });
-        }
-      } else {
-        console.warn("FILE TIDAK ADA DI DISK:", absolutePath);
+        fs.unlinkSync(absolutePath);
       }
 
-      // 2️⃣ Hapus record DB
       db.run(
         `DELETE FROM documents WHERE id = ?`,
         [id],
         (err2) => {
           if (err2) {
-            console.error("DB DELETE ERROR:", err2);
             return res
               .status(500)
-              .json({ message: "Gagal menghapus data di database" });
+              .json({ message: "Gagal hapus database" });
           }
 
           res.json({ message: "File berhasil dihapus" });
